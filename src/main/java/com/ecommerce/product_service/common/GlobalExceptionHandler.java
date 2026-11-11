@@ -2,10 +2,12 @@ package com.ecommerce.product_service.common;
 
 import com.ecommerce.product_service.common.exception.DuplicateResourceException;
 import com.ecommerce.product_service.common.exception.ResourceNotFoundException;
+import com.ecommerce.product_service.common.exception.StockConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -23,11 +25,17 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.NOT_FOUND, ex.getMessage(), request);
 	}
 
-	@ExceptionHandler(DuplicateResourceException.class)
-	public ResponseEntity<ErrorResponse> handleDuplicateResource(
-			DuplicateResourceException ex,
-			HttpServletRequest request) {
+	@ExceptionHandler({DuplicateResourceException.class, StockConflictException.class})
+	public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex, HttpServletRequest request) {
 		return build(HttpStatus.CONFLICT, ex.getMessage(), request);
+	}
+
+	// Two concurrent requests inserting the same reservation reference: the loser rolls back cleanly
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ErrorResponse> handleDataIntegrity(
+			DataIntegrityViolationException ex,
+			HttpServletRequest request) {
+		return build(HttpStatus.CONFLICT, "The request conflicts with a concurrent change, please retry", request);
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
